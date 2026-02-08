@@ -13,6 +13,7 @@ interface CommandContext {
   addTask: (columnId: string, title: string) => void;
   deleteTask: (taskId: string) => void;
   moveTask: (taskId: string, fromColumnId: string, toColumnId: string) => void;
+  moveTaskTo: (taskId: string, fromColumnId: string, targetWallId: string, targetBoardId: string, targetColumnId: string) => void;
   addColumn: (name: string) => void;
   removeColumn: (columnId: string) => void;
   search: (query: string) => void;
@@ -54,6 +55,20 @@ function findWallByName(walls: Wall[], name: string): Wall | null {
 function findBoardByName(wall: Wall, name: string): Board | null {
   const lower = name.toLowerCase();
   return wall.boards.find((b) => b.name.toLowerCase().includes(lower)) ?? null;
+}
+
+function parseMoveFlags(args: string): { title: string; column?: string; board?: string; wall?: string } {
+  const parts = args.split(/\s+(?=-(c|b|w)\s)/i);
+  const result: { title: string; column?: string; board?: string; wall?: string } = {
+    title: parts[0]!.trim(),
+  };
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i]!;
+    if (part.startsWith("-c ")) result.column = part.slice(3).trim();
+    else if (part.startsWith("-b ")) result.board = part.slice(3).trim();
+    else if (part.startsWith("-w ")) result.wall = part.slice(3).trim();
+  }
+  return result;
 }
 
 export function executeCommand(input: string, ctx: CommandContext): CommandResult {
@@ -151,22 +166,48 @@ export function executeCommand(input: string, ctx: CommandContext): CommandResul
     }
 
     case "move": {
-      // /move <title> <column>
-      // Try to split: last word(s) matching a column name
-      if (!args) return { success: false, message: "Usage: /move <title> <column>" };
-      // Try matching column name from the end
-      for (let i = parts.length - 1; i >= 2; i--) {
-        const colName = parts.slice(i).join(" ");
-        const colId = findColumnByName(ctx.board, colName);
-        if (colId) {
-          const taskTitle = parts.slice(1, i).join(" ");
-          const found = findTaskByTitle(ctx.board, taskTitle);
-          if (!found) return { success: false, message: `Task "${taskTitle}" not found` };
-          ctx.moveTask(found.taskId, found.columnId, colId);
-          return { success: true, message: `Moved to ${ctx.board.columns.find((c) => c.id === colId)?.name}` };
-        }
+      if (!args) return { success: false, message: "Usage: /move <title> -c <column> [-b <board>] [-w <wall>]" };
+      const flags = parseMoveFlags(args);
+      if (!flags.title) return { success: false, message: "Usage: /move <title> -c <column>" };
+      if (!flags.column && !flags.board && !flags.wall) {
+        return { success: false, message: "Need at least -c <column>, -b <board>, or -w <wall>" };
       }
-      return { success: false, message: "Could not find target column" };
+
+      const found = findTaskByTitle(ctx.board, flags.title);
+      if (!found) return { success: false, message: `Task "${flags.title}" not found` };
+
+      // Resolve target wall
+      let targetWall = ctx.activeWall;
+      if (flags.wall) {
+        const w = findWallByName(ctx.walls, flags.wall);
+        if (!w) return { success: false, message: `Wall "${flags.wall}" not found` };
+        targetWall = w;
+      }
+
+      // Resolve target board (within target wall)
+      let targetBoard = flags.wall ? targetWall.boards[0]! : ctx.board;
+      if (flags.board) {
+        const b = findBoardByName(targetWall, flags.board);
+        if (!b) return { success: false, message: `Board "${flags.board}" not found` };
+        targetBoard = b;
+      }
+
+      // Resolve target column (within target board)
+      let targetColId = targetBoard.columns[0]?.id;
+      if (flags.column) {
+        const colId = findColumnByName(targetBoard, flags.column);
+        if (!colId) return { success: false, message: `Column "${flags.column}" not found` };
+        targetColId = colId;
+      }
+      if (!targetColId) return { success: false, message: "Target board has no columns" };
+
+      const targetColName = targetBoard.columns.find((c) => c.id === targetColId)?.name ?? "";
+      ctx.moveTaskTo(found.taskId, found.columnId, targetWall.id, targetBoard.id, targetColId);
+
+      const dest = targetWall.id !== ctx.activeWall.id || targetBoard.id !== ctx.board.id
+        ? `${targetWall.name} / ${targetBoard.name} / ${targetColName}`
+        : targetColName;
+      return { success: true, message: `Moved to ${dest}` };
     }
 
     case "edit": {

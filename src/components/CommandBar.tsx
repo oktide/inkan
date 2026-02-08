@@ -4,7 +4,7 @@ import TextInput from "ink-text-input";
 
 const COMMANDS = [
   { name: "new", args: "task|board|wall|column <name>", desc: "Create task, board, wall, or column" },
-  { name: "move", args: "<title> <column>", desc: "Move task to column" },
+  { name: "move", args: "<title> -c <col> [-b <board>] [-w <wall>]", desc: "Move task" },
   { name: "delete", args: "[board|wall|column] <name>", desc: "Delete task, board, wall, or column" },
   { name: "edit", args: "<title>", desc: "Open task for editing" },
   { name: "open", args: "<title>", desc: "Open task detail + body" },
@@ -28,7 +28,18 @@ type ArgPhase = "command" | "task" | "column" | "wall" | "board" | "newSub" | "n
 
 const NEW_SUB_CANDIDATES = ["task", "board", "wall", "column"];
 
-function getArgPhase(value: string, confirmedTaskTitle: string | null): ArgPhase {
+function getMoveFlag(value: string): ArgPhase {
+  const lastC = value.lastIndexOf(" -c ");
+  const lastB = value.lastIndexOf(" -b ");
+  const lastW = value.lastIndexOf(" -w ");
+  const max = Math.max(lastC, lastB, lastW);
+  if (max === -1) return "task";
+  if (max === lastC) return "column";
+  if (max === lastB) return "board";
+  return "wall";
+}
+
+function getArgPhase(value: string): ArgPhase {
   if (!value.includes(" ")) return "command";
 
   const lower = value.toLowerCase();
@@ -36,9 +47,7 @@ function getArgPhase(value: string, confirmedTaskTitle: string | null): ArgPhase
   // /new <...> — determine subcommand phase
   if (lower.startsWith("new ")) {
     const afterNew = value.slice(4).trimStart();
-    // If no space after subcommand word yet, suggest subcommands
     if (!afterNew.includes(" ")) return "newSub";
-    // After subcommand is chosen, no autocomplete for the name itself
     return "none";
   }
 
@@ -59,61 +68,63 @@ function getArgPhase(value: string, confirmedTaskTitle: string | null): ArgPhase
   }
 
   if (lower.startsWith("edit ") || lower.startsWith("open ")) return "task";
-  if (lower.startsWith("move ")) {
-    return confirmedTaskTitle ? "column" : "task";
-  }
+  if (lower.startsWith("move ")) return getMoveFlag(value);
   return "none";
 }
 
-function getPartialArg(value: string, phase: ArgPhase, confirmedTaskTitle: string | null): string {
+function getMovePartialArg(value: string): string {
+  const lastC = value.lastIndexOf(" -c ");
+  const lastB = value.lastIndexOf(" -b ");
+  const lastW = value.lastIndexOf(" -w ");
+  const max = Math.max(lastC, lastB, lastW);
+  if (max === -1) {
+    // No flags yet — partial is the task title after "move "
+    return value.slice(5);
+  }
+  // Text after the last flag marker (" -X " = 4 chars)
+  return value.slice(max + 4);
+}
+
+function getPartialArg(value: string, phase: ArgPhase): string {
   if (phase === "command" || phase === "none") return "";
 
   if (phase === "newSub") {
-    // Everything after "new "
     const idx = value.indexOf(" ");
     return idx >= 0 ? value.slice(idx + 1) : "";
   }
 
+  const lower = value.toLowerCase();
+
+  // /move uses flag-based partial extraction
+  if (lower.startsWith("move ")) return getMovePartialArg(value);
+
   if (phase === "wall") {
-    const lower = value.toLowerCase();
     if (lower.startsWith("delete ")) {
-      // "delete wall " prefix
       const afterDelete = value.slice(7).trimStart();
       const spaceIdx = afterDelete.indexOf(" ");
       return spaceIdx >= 0 ? afterDelete.slice(spaceIdx + 1) : "";
     }
-    // "wall " prefix
     return value.slice(5);
   }
 
   if (phase === "board") {
-    const lower = value.toLowerCase();
     if (lower.startsWith("delete ")) {
-      // "delete board " prefix
       const afterDelete = value.slice(7).trimStart();
       const spaceIdx = afterDelete.indexOf(" ");
       return spaceIdx >= 0 ? afterDelete.slice(spaceIdx + 1) : "";
     }
-    // "board " prefix
     return value.slice(6);
   }
 
   if (phase === "column") {
-    const lower = value.toLowerCase();
     if (lower.startsWith("delete ")) {
-      // "delete column " prefix
       const afterDelete = value.slice(7).trimStart();
       const spaceIdx = afterDelete.indexOf(" ");
       return spaceIdx >= 0 ? afterDelete.slice(spaceIdx + 1) : "";
     }
-    if (confirmedTaskTitle && lower.startsWith("move ")) {
-      // For /move after task confirmed: arg text is after "move <confirmedTitle> "
-      const prefix = value.slice(0, 5) + confirmedTaskTitle + " ";
-      return value.slice(prefix.length);
-    }
   }
 
-  // For edit/delete/move task phase: everything after first space
+  // For edit/delete task phase: everything after first space
   const spaceIdx = value.indexOf(" ");
   return spaceIdx >= 0 ? value.slice(spaceIdx + 1) : "";
 }
@@ -132,7 +143,6 @@ function computeGhostText(partial: string, candidates: string[]): string {
 export function CommandBar({ onSubmit, onCancel, feedback, taskTitles, columnNames, wallNames, boardNames }: CommandBarProps) {
   const [value, setValue] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [confirmedTaskTitle, setConfirmedTaskTitle] = useState<string | null>(null);
 
   const matches = useMemo(() => {
     const typed = value.toLowerCase().split(/\s+/)[0] ?? "";
@@ -143,8 +153,8 @@ export function CommandBar({ onSubmit, onCancel, feedback, taskTitles, columnNam
   const showSuggestions = !value.includes(" ") && matches.length > 0;
 
   const { phase, partialArg, ghostText } = useMemo(() => {
-    const phase = getArgPhase(value, confirmedTaskTitle);
-    const partialArg = getPartialArg(value, phase, confirmedTaskTitle);
+    const phase = getArgPhase(value);
+    const partialArg = getPartialArg(value, phase);
 
     let candidates: string[] = [];
     if (phase === "task") candidates = taskTitles;
@@ -155,7 +165,7 @@ export function CommandBar({ onSubmit, onCancel, feedback, taskTitles, columnNam
 
     const ghostText = computeGhostText(partialArg, candidates);
     return { phase, partialArg, ghostText };
-  }, [value, confirmedTaskTitle, taskTitles, columnNames, wallNames, boardNames]);
+  }, [value, taskTitles, columnNames, wallNames, boardNames]);
 
   useInput((input, key) => {
     if (showSuggestions) {
@@ -179,13 +189,7 @@ export function CommandBar({ onSubmit, onCancel, feedback, taskTitles, columnNam
 
     // Arg phase: Tab accepts ghost text
     if (!showSuggestions && key.tab && ghostText) {
-      if (phase === "task" && value.toLowerCase().startsWith("move ")) {
-        // Confirm the task title and append space for column arg
-        const fullTitle = partialArg + ghostText;
-        setConfirmedTaskTitle(fullTitle);
-        const cmdPrefix = value.slice(0, value.indexOf(" ") + 1);
-        setValue(cmdPrefix + fullTitle + " ");
-      } else if (phase === "newSub") {
+      if (phase === "newSub") {
         // After completing subcommand, add a space for the name
         setValue(value.slice(0, value.indexOf(" ") + 1) + partialArg + ghostText + " ");
       } else {
@@ -196,13 +200,6 @@ export function CommandBar({ onSubmit, onCancel, feedback, taskTitles, columnNam
   });
 
   function handleChange(val: string) {
-    // Clear confirmedTaskTitle if user backspaces past it
-    if (confirmedTaskTitle) {
-      const expectedPrefix = "move " + confirmedTaskTitle;
-      if (!val.toLowerCase().startsWith(expectedPrefix.toLowerCase())) {
-        setConfirmedTaskTitle(null);
-      }
-    }
     setValue(val);
     setSelectedIndex(0);
   }
@@ -218,18 +215,8 @@ export function CommandBar({ onSubmit, onCancel, feedback, taskTitles, columnNam
       }
     }
 
-    // For /move in task phase with ghost text: Enter confirms task (like Tab)
-    if (phase === "task" && ghostText && val.toLowerCase().startsWith("move ")) {
-      const fullTitle = partialArg + ghostText;
-      setConfirmedTaskTitle(fullTitle);
-      const cmdPrefix = val.slice(0, val.indexOf(" ") + 1);
-      setValue(cmdPrefix + fullTitle + " ");
-      return;
-    }
-
     onSubmit(val);
     setValue("");
-    setConfirmedTaskTitle(null);
   }
 
   const showGhost = !showSuggestions && (phase === "task" || phase === "column" || phase === "wall" || phase === "board" || phase === "newSub") && ghostText;

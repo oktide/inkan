@@ -7,6 +7,7 @@ type Action =
   | { type: "ADD_TASK"; columnId: string; title: string }
   | { type: "DELETE_TASK"; taskId: string }
   | { type: "MOVE_TASK"; taskId: string; fromColumnId: string; toColumnId: string }
+  | { type: "MOVE_TASK_TO"; taskId: string; fromColumnId: string; targetWallId: string; targetBoardId: string; targetColumnId: string }
   | { type: "EDIT_TASK"; taskId: string; updates: Partial<Pick<Task, "title" | "priority" | "dueDate" | "tags">> }
   | { type: "ADD_COLUMN"; name: string }
   | { type: "REMOVE_COLUMN"; columnId: string }
@@ -118,6 +119,71 @@ function reducer(state: AppState, action: Action): AppState {
           return col;
         }),
       }));
+      saveAppData(newData);
+      return { ...state, data: newData };
+    }
+
+    case "MOVE_TASK_TO": {
+      const sourceBoard = getActiveBoard(data);
+      const task = sourceBoard.tasks[action.taskId];
+      if (!task) return state;
+
+      const sameBoard = action.targetWallId === data.activeWallId && action.targetBoardId === data.activeBoardId;
+
+      if (sameBoard) {
+        const newData = updateActiveBoard(data, (board) => ({
+          ...board,
+          columns: board.columns.map((col) => {
+            if (col.id === action.fromColumnId) {
+              return { ...col, taskIds: col.taskIds.filter((id) => id !== action.taskId) };
+            }
+            if (col.id === action.targetColumnId) {
+              return { ...col, taskIds: [...col.taskIds, action.taskId] };
+            }
+            return col;
+          }),
+        }));
+        saveAppData(newData);
+        return { ...state, data: newData };
+      }
+
+      // Cross-board move: remove from source board
+      let newData = updateActiveBoard(data, (board) => {
+        const { [action.taskId]: _, ...remainingTasks } = board.tasks;
+        return {
+          ...board,
+          tasks: remainingTasks,
+          columns: board.columns.map((col) => ({
+            ...col,
+            taskIds: col.taskIds.filter((id) => id !== action.taskId),
+          })),
+        };
+      });
+
+      // Add to target board
+      newData = {
+        ...newData,
+        walls: newData.walls.map((wall) =>
+          wall.id === action.targetWallId
+            ? {
+                ...wall,
+                boards: wall.boards.map((board) =>
+                  board.id === action.targetBoardId
+                    ? {
+                        ...board,
+                        tasks: { ...board.tasks, [action.taskId]: task },
+                        columns: board.columns.map((col) =>
+                          col.id === action.targetColumnId
+                            ? { ...col, taskIds: [...col.taskIds, action.taskId] }
+                            : col
+                        ),
+                      }
+                    : board
+                ),
+              }
+            : wall
+        ),
+      };
       saveAppData(newData);
       return { ...state, data: newData };
     }
@@ -306,6 +372,10 @@ export function useBoard(initialData: AppData) {
     dispatch({ type: "MOVE_TASK", taskId, fromColumnId, toColumnId });
   }, []);
 
+  const moveTaskTo = useCallback((taskId: string, fromColumnId: string, targetWallId: string, targetBoardId: string, targetColumnId: string) => {
+    dispatch({ type: "MOVE_TASK_TO", taskId, fromColumnId, targetWallId, targetBoardId, targetColumnId });
+  }, []);
+
   const editTask = useCallback((taskId: string, updates: Partial<Pick<Task, "title" | "priority" | "dueDate" | "tags">>) => {
     dispatch({ type: "EDIT_TASK", taskId, updates });
   }, []);
@@ -358,6 +428,7 @@ export function useBoard(initialData: AppData) {
     addTask,
     deleteTask,
     moveTask,
+    moveTaskTo,
     editTask,
     addColumn,
     removeColumn,

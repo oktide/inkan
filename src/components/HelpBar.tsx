@@ -22,7 +22,7 @@ const FULL_HELP = [
   ["q", "Quit"],
   ["", ""],
   ["/new [task|board|wall|column] <name>", "Create task, board, wall, or column"],
-  ["/move <title> <col>", "Move task"],
+  ["/move <title> -c <col> [-b] [-w]", "Move task (across boards/walls)"],
   ["/delete [task|board|wall|column] <name>", "Delete task, board, wall, or column"],
   ["/edit <title>", "Edit task"],
   ["/open <title>", "Open task detail + body"],
@@ -48,7 +48,7 @@ export function HelpBar({ mode, showFullHelp }: HelpBarProps) {
           key ? (
             <Box key={i} gap={1}>
               <Text color="yellow" bold>
-                {key!.padEnd(22)}
+                {key!.padEnd(36)}
               </Text>
               <Text>{desc}</Text>
             </Box>

@@ -16,4 +16,7 @@ Thumbs.db
 # Node Modules
 node_modules/
 
+# Compiled output
+dist/
+
 .env

@@ -181,6 +181,7 @@ export function App() {
       addTask: boardActions.addTask,
       deleteTask: boardActions.deleteTask,
       moveTask: boardActions.moveTask,
+      moveTaskTo: boardActions.moveTaskTo,
       addColumn: boardActions.addColumn,
       removeColumn: boardActions.removeColumn,
       search: boardActions.search,
