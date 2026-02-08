@@ -1,0 +1,19 @@
+# Ink build files (compiled JSON)
+#*.json
+
+# Ink temporary/autosave files
+*.ink.bk
+*.ink.autosave
+
+# IDE specific
+.vscode/
+.idea/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Node Modules
+node_modules/
+
+.env
