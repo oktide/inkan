@@ -4,6 +4,7 @@ import TextInput from "ink-text-input";
 import { Board } from "./components/Board.js";
 import { CommandBar } from "./components/CommandBar.js";
 import { TaskDetail } from "./components/TaskDetail.js";
+import { SubtaskView } from "./components/SubtaskView.js";
 import { TaskDrawer } from "./components/TaskDrawer.js";
 import { HelpBar } from "./components/HelpBar.js";
 import { useBoard } from "./hooks/useBoard.js";
@@ -24,7 +25,6 @@ export function App() {
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
   const [confirmMessage, setConfirmMessage] = useState("");
-  const [waitingForMove, setWaitingForMove] = useState(false);
   const [viewTaskId, setViewTaskId] = useState<string | null>(null);
 
   // Responsive width detection
@@ -64,8 +64,9 @@ export function App() {
       return;
     }
 
-    // Detail mode handles its own input
+    // Detail and subtask modes handle their own input
     if (mode === "detail") return;
+    if (mode === "subtasks") return;
 
     // Confirm mode
     if (mode === "confirm") {
@@ -91,11 +92,8 @@ export function App() {
       return;
     }
 
-    // Board mode - waiting for move direction
-    if (waitingForMove) {
-      setWaitingForMove(false);
-      if (!nav.currentTaskId || !nav.currentColumn) return;
-
+    // Board mode — Alt+key: move/reorder task
+    if (key.meta && nav.currentTaskId && nav.currentColumn) {
       const taskId = nav.currentTaskId;
       const fromCol = nav.currentColumn;
 
@@ -104,15 +102,23 @@ export function App() {
         if (idx > 0) {
           const toCol = board.columns[idx - 1]!;
           boardActions.moveTask(taskId, fromCol.id, toCol.id);
-          nav.moveLeft();
+          nav.setColumnIndex(idx - 1);
+          nav.setTaskIndex(toCol.taskIds.length); // appended at end
         }
       } else if (input === "l" || key.rightArrow) {
         const idx = board.columns.findIndex((c) => c.id === fromCol.id);
         if (idx < board.columns.length - 1) {
           const toCol = board.columns[idx + 1]!;
           boardActions.moveTask(taskId, fromCol.id, toCol.id);
-          nav.moveRight();
+          nav.setColumnIndex(idx + 1);
+          nav.setTaskIndex(toCol.taskIds.length); // appended at end
         }
+      } else if (input === "k" || key.upArrow) {
+        boardActions.reorderTask(fromCol.id, taskId, "up");
+        nav.moveUp();
+      } else if (input === "j" || key.downArrow) {
+        boardActions.reorderTask(fromCol.id, taskId, "down");
+        nav.moveDown();
       }
       return;
     }
@@ -163,10 +169,6 @@ export function App() {
           setMode("confirm");
         }
       }
-    } else if (input === "m") {
-      if (nav.currentTaskId) {
-        setWaitingForMove(true);
-      }
     } else if (input === "v") {
       toggleView(nav.currentTaskId);
     }
@@ -210,8 +212,9 @@ export function App() {
   }
 
   function handleQuickAddSubmit(val: string) {
-    if (val.trim() && nav.currentColumn) {
-      boardActions.addTask(nav.currentColumn.id, val.trim());
+    const firstCol = board.columns[0];
+    if (val.trim() && firstCol) {
+      boardActions.addTask(firstCol.id, val.trim());
     }
     setQuickAdd(false);
     setQuickAddValue("");
@@ -231,16 +234,21 @@ export function App() {
         {searchQuery && (
           <Text color="yellow">Search: "{searchQuery}"</Text>
         )}
-        {waitingForMove && (
-          <Text color="yellow" bold>
-            Move: press h/l for direction
-          </Text>
-        )}
       </Box>
 
       {/* Main content */}
       <Box flexDirection="row" flexGrow={1}>
-        {mode === "detail" && detailTask ? (
+        {mode === "subtasks" && detailTask ? (
+          <SubtaskView
+            task={detailTask}
+            onSave={(updates) => {
+              boardActions.editTask(detailTaskId!, updates);
+            }}
+            onClose={() => {
+              setMode("detail");
+            }}
+          />
+        ) : mode === "detail" && detailTask ? (
           <TaskDetail
             task={detailTask}
             onSave={(updates) => {
@@ -249,6 +257,9 @@ export function App() {
             onClose={() => {
               setMode("board");
               setDetailTaskId(null);
+            }}
+            onOpenSubtasks={() => {
+              setMode("subtasks");
             }}
           />
         ) : (

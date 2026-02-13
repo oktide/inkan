@@ -1,9 +1,17 @@
+export interface Subtask {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
 export interface Task {
   id: string;
   title: string;
+  description?: string;
   priority?: "low" | "medium" | "high";
   dueDate?: string;
   tags?: string[];
+  subtasks?: Subtask[];
   createdAt: string;
   updatedAt: string;
 }
@@ -34,4 +42,4 @@ export interface AppData {
   activeBoardId: string;
 }
 
-export type AppMode = "board" | "command" | "detail" | "confirm";
+export type AppMode = "board" | "command" | "detail" | "confirm" | "subtasks";

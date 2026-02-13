@@ -143,6 +143,7 @@ function computeGhostText(partial: string, candidates: string[]): string {
 export function CommandBar({ onSubmit, onCancel, feedback, taskTitles, columnNames, wallNames, boardNames }: CommandBarProps) {
   const [value, setValue] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [inputKey, setInputKey] = useState(0);
 
   const matches = useMemo(() => {
     const typed = value.toLowerCase().split(/\s+/)[0] ?? "";
@@ -182,6 +183,7 @@ export function CommandBar({ onSubmit, onCancel, feedback, taskTitles, columnNam
         if (match) {
           setValue(match.name + " ");
           setSelectedIndex(0);
+          setInputKey(k => k + 1);
         }
         return;
       }
@@ -195,6 +197,7 @@ export function CommandBar({ onSubmit, onCancel, feedback, taskTitles, columnNam
       } else {
         setValue(value + ghostText);
       }
+      setInputKey(k => k + 1);
       return;
     }
   });
@@ -258,6 +261,7 @@ export function CommandBar({ onSubmit, onCancel, feedback, taskTitles, columnNam
       <Box borderStyle="single" borderColor="yellow" paddingX={1}>
         <Text color="yellow">/</Text>
         <TextInput
+          key={inputKey}
           value={value}
           onChange={handleChange}
           onSubmit={handleSubmit}

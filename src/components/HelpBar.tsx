@@ -15,7 +15,7 @@ const FULL_HELP = [
   ["Enter", "Open task"],
   ["n", "New task"],
   ["d", "Delete task"],
-  ["m+h/l", "Move task"],
+  ["Alt+←↑↓→", "Move/reorder task"],
   ["v", "View task body"],
   ["/", "Command bar"],
   ["?", "Toggle help"],
@@ -62,10 +62,11 @@ export function HelpBar({ mode, showFullHelp }: HelpBarProps) {
   }
 
   const hints: Record<AppMode, string> = {
-    board: "hjkl:nav  n:new  d:del  m+h/l:move  Enter:detail  v:view  /:cmd  ?:help  q:quit",
+    board: "hjkl:nav  n:new  d:del  Alt+hjkl:move  Enter:detail  v:view  /:cmd  ?:help  q:quit",
     command: "Enter:run  Esc:cancel",
-    detail: "j/k:nav  Enter/e:edit  b:body  Esc/q:close",
+    detail: "j/k:nav  Enter/e:edit  s:subtasks  u:update  b:body  Esc/q:close",
     confirm: "y:confirm  n/Esc:cancel",
+    subtasks: "j/k:nav  Space:toggle  n:add  d:del  e:edit  J/K:reorder  Esc:back",
   };
 
   return (

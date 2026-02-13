@@ -102,11 +102,11 @@ export function executeCommand(input: string, ctx: CommandContext): CommandResul
       }
       if (firstWord === "task") {
         if (!rest) return { success: false, message: "Usage: /new task <name>" };
-        ctx.addTask(ctx.currentColumnId, rest);
+        ctx.addTask(ctx.board.columns[0]?.id ?? ctx.currentColumnId, rest);
         return { success: true, message: `Created "${rest}"` };
       }
       // Backward compat: /new <title> creates a task
-      ctx.addTask(ctx.currentColumnId, args);
+      ctx.addTask(ctx.board.columns[0]?.id ?? ctx.currentColumnId, args);
       return { success: true, message: `Created "${args}"` };
     }
 

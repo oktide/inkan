@@ -8,7 +8,7 @@ type Action =
   | { type: "DELETE_TASK"; taskId: string }
   | { type: "MOVE_TASK"; taskId: string; fromColumnId: string; toColumnId: string }
   | { type: "MOVE_TASK_TO"; taskId: string; fromColumnId: string; targetWallId: string; targetBoardId: string; targetColumnId: string }
-  | { type: "EDIT_TASK"; taskId: string; updates: Partial<Pick<Task, "title" | "priority" | "dueDate" | "tags">> }
+  | { type: "EDIT_TASK"; taskId: string; updates: Partial<Pick<Task, "title" | "description" | "priority" | "dueDate" | "tags" | "subtasks">> }
   | { type: "ADD_COLUMN"; name: string }
   | { type: "REMOVE_COLUMN"; columnId: string }
   | { type: "SEARCH"; query: string }
@@ -18,7 +18,8 @@ type Action =
   | { type: "DELETE_WALL"; wallId: string }
   | { type: "ADD_BOARD"; name: string }
   | { type: "SWITCH_BOARD"; boardId: string }
-  | { type: "DELETE_BOARD"; boardId: string };
+  | { type: "DELETE_BOARD"; boardId: string }
+  | { type: "REORDER_TASK"; columnId: string; taskId: string; direction: "up" | "down" };
 
 interface AppState {
   data: AppData;
@@ -346,6 +347,24 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, data: newData };
     }
 
+    case "REORDER_TASK": {
+      const newData = updateActiveBoard(data, (board) => ({
+        ...board,
+        columns: board.columns.map((col) => {
+          if (col.id !== action.columnId) return col;
+          const ids = [...col.taskIds];
+          const idx = ids.indexOf(action.taskId);
+          if (idx === -1) return col;
+          const swapIdx = action.direction === "up" ? idx - 1 : idx + 1;
+          if (swapIdx < 0 || swapIdx >= ids.length) return col;
+          [ids[idx], ids[swapIdx]] = [ids[swapIdx]!, ids[idx]!];
+          return { ...col, taskIds: ids };
+        }),
+      }));
+      saveAppData(newData);
+      return { ...state, data: newData };
+    }
+
     default:
       return state;
   }
@@ -376,7 +395,7 @@ export function useBoard(initialData: AppData) {
     dispatch({ type: "MOVE_TASK_TO", taskId, fromColumnId, targetWallId, targetBoardId, targetColumnId });
   }, []);
 
-  const editTask = useCallback((taskId: string, updates: Partial<Pick<Task, "title" | "priority" | "dueDate" | "tags">>) => {
+  const editTask = useCallback((taskId: string, updates: Partial<Pick<Task, "title" | "description" | "priority" | "dueDate" | "tags" | "subtasks">>) => {
     dispatch({ type: "EDIT_TASK", taskId, updates });
   }, []);
 
@@ -420,6 +439,10 @@ export function useBoard(initialData: AppData) {
     dispatch({ type: "DELETE_BOARD", boardId });
   }, []);
 
+  const reorderTask = useCallback((columnId: string, taskId: string, direction: "up" | "down") => {
+    dispatch({ type: "REORDER_TASK", columnId, taskId, direction });
+  }, []);
+
   return {
     board,
     activeWall,
@@ -440,5 +463,6 @@ export function useBoard(initialData: AppData) {
     addBoard,
     switchBoard,
     deleteBoard,
+    reorderTask,
   };
 }

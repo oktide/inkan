@@ -101,6 +101,17 @@ export function saveTaskBody(taskId: string, content: string): void {
   fs.writeFileSync(taskBodyPath(taskId), content);
 }
 
+export function appendTaskUpdate(taskId: string, content: string): void {
+  fs.mkdirSync(TASKS_DIR, { recursive: true });
+  const filePath = taskBodyPath(taskId);
+  const existing = loadTaskBody(taskId);
+  const now = new Date();
+  const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const entry = `## ${timestamp}\n\n${content}`;
+  const updated = existing.trim() ? `${entry}\n\n---\n\n${existing}` : entry;
+  fs.writeFileSync(filePath, updated);
+}
+
 export function deleteTaskBody(taskId: string): void {
   try {
     fs.unlinkSync(taskBodyPath(taskId));
