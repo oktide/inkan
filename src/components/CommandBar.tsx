@@ -12,6 +12,7 @@ const COMMANDS = [
   { name: "board", args: "<name>", desc: "Switch to a board" },
   { name: "search", args: "<query>", desc: "Filter visible tasks" },
   { name: "help", args: "", desc: "Show all keybindings" },
+  { name: "git", args: "init|remote|push|pull|status", desc: "Git sync for task data" },
 ];
 
 interface CommandBarProps {

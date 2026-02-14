@@ -26,6 +26,11 @@ interface CommandContext {
   addBoard: (name: string) => void;
   deleteBoard: (boardId: string) => void;
   switchBoard: (boardId: string) => void;
+  gitInit: () => { success: boolean; message: string };
+  gitSetRemote: (url: string) => { success: boolean; message: string };
+  gitPush: () => { success: boolean; message: string };
+  gitPull: () => { success: boolean; message: string };
+  gitStatus: () => { initialized: boolean; remote: string | null; clean: boolean };
 }
 
 function findTaskByTitle(board: Board, title: string): { taskId: string; columnId: string } | null {
@@ -238,6 +243,34 @@ export function executeCommand(input: string, ctx: CommandContext): CommandResul
     case "help": {
       ctx.showHelp();
       return { success: true, message: "" };
+    }
+
+    case "git": {
+      const sub = parts[1]?.toLowerCase();
+      if (!sub) return { success: false, message: "Usage: /git [init|remote|push|pull|status]" };
+
+      if (sub === "init") {
+        return ctx.gitInit();
+      }
+      if (sub === "remote") {
+        const url = parts.slice(2).join(" ");
+        if (!url) return { success: false, message: "Usage: /git remote <url>" };
+        return ctx.gitSetRemote(url);
+      }
+      if (sub === "push") {
+        return ctx.gitPush();
+      }
+      if (sub === "pull") {
+        return ctx.gitPull();
+      }
+      if (sub === "status") {
+        const s = ctx.gitStatus();
+        if (!s.initialized) return { success: true, message: "Git: not initialized — run /git init" };
+        const remote = s.remote ?? "none";
+        const status = s.clean ? "clean" : "uncommitted changes";
+        return { success: true, message: `Git: remote=${remote}, ${status}` };
+      }
+      return { success: false, message: `Unknown git subcommand: ${sub}` };
     }
 
     default:

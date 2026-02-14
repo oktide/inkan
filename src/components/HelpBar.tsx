@@ -30,6 +30,7 @@ const FULL_HELP = [
   ["/board <name>", "Switch board"],
   ["/search <query>", "Filter tasks"],
   ["/help", "Show help"],
+  ["/git init|remote|push|pull|status", "Git sync for task data"],
 ];
 
 export function HelpBar({ mode, showFullHelp }: HelpBarProps) {

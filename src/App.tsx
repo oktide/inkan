@@ -11,6 +11,7 @@ import { useBoard } from "./hooks/useBoard.js";
 import { useNavigation } from "./hooks/useNavigation.js";
 import { executeCommand } from "./commands.js";
 import { loadAppData } from "./storage.js";
+import { gitPull, gitPush, gitInit, gitSetRemote, gitStatus as gitStatusCmd } from "./git.js";
 import type { AppMode } from "./types.js";
 
 export function App() {
@@ -26,6 +27,7 @@ export function App() {
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
   const [confirmMessage, setConfirmMessage] = useState("");
   const [viewTaskId, setViewTaskId] = useState<string | null>(null);
+  const [gitError, setGitError] = useState("");
 
   // Responsive width detection
   const { stdout } = useStdout();
@@ -34,6 +36,14 @@ export function App() {
   // Quick-add mode
   const [quickAdd, setQuickAdd] = useState(false);
   const [quickAddValue, setQuickAddValue] = useState("");
+
+  // Pull from remote on startup
+  useEffect(() => {
+    const result = gitPull();
+    if (!result.success) {
+      setGitError(result.message);
+    }
+  }, []);
 
   // Re-clamp navigation when board changes
   useEffect(() => {
@@ -125,6 +135,12 @@ export function App() {
 
     // Board mode - normal navigation
     if (input === "q") {
+      const result = gitPush();
+      if (!result.success) {
+        setGitError(result.message);
+        setTimeout(() => exit(), 1500);
+        return;
+      }
       exit();
       return;
     }
@@ -196,6 +212,11 @@ export function App() {
       addBoard: boardActions.addBoard,
       deleteBoard: boardActions.deleteBoard,
       switchBoard: boardActions.switchBoard,
+      gitInit,
+      gitSetRemote,
+      gitPush,
+      gitPull,
+      gitStatus: gitStatusCmd,
     });
 
     if (result.message) {
@@ -313,6 +334,13 @@ export function App() {
           wallNames={walls.map((w) => w.name)}
           boardNames={activeWall.boards.map((b) => b.name)}
         />
+      )}
+
+      {/* Git error */}
+      {gitError && (
+        <Box paddingX={1}>
+          <Text color="red">Git: {gitError}</Text>
+        </Box>
       )}
 
       {/* Help / status bar */}

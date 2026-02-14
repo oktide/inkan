@@ -3,6 +3,7 @@ import path from "node:path";
 import os from "node:os";
 import { nanoid } from "nanoid";
 import type { Board, AppData, Wall } from "./types.js";
+import { gitCommit } from "./git.js";
 
 const CONFIG_DIR = path.join(os.homedir(), ".config", "inkan");
 const BOARD_FILE = path.join(CONFIG_DIR, "board.json");
@@ -82,6 +83,7 @@ export function loadAppData(): AppData {
 export function saveAppData(data: AppData): void {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
   fs.writeFileSync(BOARD_FILE, JSON.stringify(data, null, 2));
+  gitCommit("Update board data");
 }
 
 export function taskBodyPath(taskId: string): string {
@@ -99,6 +101,7 @@ export function loadTaskBody(taskId: string): string {
 export function saveTaskBody(taskId: string, content: string): void {
   fs.mkdirSync(TASKS_DIR, { recursive: true });
   fs.writeFileSync(taskBodyPath(taskId), content);
+  gitCommit("Update task body");
 }
 
 export function appendTaskUpdate(taskId: string, content: string): void {
@@ -110,6 +113,7 @@ export function appendTaskUpdate(taskId: string, content: string): void {
   const entry = `## ${timestamp}\n\n${content}`;
   const updated = existing.trim() ? `${entry}\n\n---\n\n${existing}` : entry;
   fs.writeFileSync(filePath, updated);
+  gitCommit("Add task update");
 }
 
 export function deleteTaskBody(taskId: string): void {
@@ -118,4 +122,5 @@ export function deleteTaskBody(taskId: string): void {
   } catch {
     // file may not exist, that's fine
   }
+  gitCommit("Delete task body");
 }

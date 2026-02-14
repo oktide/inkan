@@ -3,6 +3,7 @@ import { withFullScreen } from "fullscreen-ink";
 import { nanoid } from "nanoid";
 import { App } from "./App.js";
 import { loadAppData, saveAppData } from "./storage.js";
+import { gitPush } from "./git.js";
 import type { Task } from "./types.js";
 
 const args = process.argv.slice(2);
@@ -28,6 +29,7 @@ if (nIndex !== -1) {
   board.tasks[task.id] = task;
   board.columns[0].taskIds.push(task.id);
   saveAppData(appData);
+  gitPush();
   console.log(`Added "${title}" to ${board.columns[0].name}`);
   process.exit(0);
 } else {
